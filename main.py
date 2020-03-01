@@ -26,13 +26,28 @@ numberEmojis = {
 
 guildCardQueues = {}
 
+guildSkips = {}
+
+guildGameInProg = {}
+
+guildVotes = {}
 
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
 
+    global guildSkips
+    global guildGameInProg
+    global guildVotes
     if message.content.startswith('$play'):
+        guildId = message.guild.id
+        if guildId in guildGameInProg:
+            if guildGameInProg[guildId]:
+                await message.channel.send('Game is already in progress!')
+                return
+        guildSkips[guildId] = {'skip': False, 'stop': False}
+        guildVotes[guildId] = {}
         thinkingDuration = 45
         gameDuration = 180
         hideCard = False
@@ -56,6 +71,7 @@ async def on_message(message):
                 return
         if len(mentions) > 6:
             hideCard = True
+        guildGameInProg[guildId] = True
         messageContentList = message.content.split()
         length = len(messageContentList)
         if length > (len(mentions) + 1):
@@ -70,7 +86,7 @@ async def on_message(message):
                     argOne = int(messageContentList[len(mentions) + 1])
                     argTwo = int(messageContentList[len(mentions) + 2])
                     thinkingDuration = argOne if argOne < 60 else thinkingDuration
-                    gameDuration = argTwo * 60 if argTwo > 1 and argTwo < 5 else gameDuration
+                    gameDuration = argTwo * 60 if argTwo >= 1 and argTwo <= 5 else gameDuration
                 except:
                     pass
         # get words
@@ -84,14 +100,21 @@ async def on_message(message):
         cardMsg = await message.channel.send(cardText)
         # DM players listed
         word = random.choice(words)
-        chameleon = random.randint(0, len(mentions))
+        chameleon = random.randint(0, len(mentions)-1)
         for i in range(0, len(mentions)):
             if i == chameleon:
                 await sendWordDM('', mentions[i], True)
             else:
                 await sendWordDM(word, mentions[i], False)
         # wait for people to come up with words
-        await asyncio.sleep(thinkingDuration)
+        i = 0
+        while i < thinkingDuration and not guildSkips[guildId]['skip']:
+            await asyncio.sleep(1)
+            i += 1
+        guildSkips[guildId]['skip'] = False
+        if guildSkips[guildId]['stop']:
+            guildGameInProg[guildId] = False
+            return
         # hide card if > 6
         if hideCard:
             await cardMsg.edit(content='**{}**\n\n*Card is hidden since we have more than 6 players.*')
@@ -99,16 +122,28 @@ async def on_message(message):
         await asyncio.sleep(3 * len(mentions))
         # wait for game time - 30 seconds
         gameTimerMsg = await message.channel.send('Begin discussion!')
-        await asyncio.sleep(gameDuration - 30)
+        i = 0
+        while i < gameDuration - 30 and not guildSkips[guildId]['skip']:
+            await asyncio.sleep(1)
+            i += 1
+        guildSkips[guildId]['skip'] = False
+        if guildSkips[guildId]['stop']:
+            guildGameInProg[guildId] = False
+            return
         # display voting message, add reactions
         votingMessageString = await makeVotingMessage(message.mentions, numberEmojis)
         votingMessage = await message.channel.send(votingMessageString)
-        await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
+        # await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
         # collect votes
-        await asyncio.sleep(30)
-        result = await getResult(votingMessage, numberEmojis)
+        i = 0
+        while i < 30 and not guildSkips[guildId]['skip']:
+            await asyncio.sleep(1)
+            i += 1
+        # result = await getResult(votingMessage, numberEmojis)
+        result = await getMsgResults(guildVotes[guildId].items(), mentions)
         if result == -1:
             await message.channel.send('Voting resulted in a tie! Chameleon wins!')
+            guildGameInProg[guildId] = False
             return
         else:
             chameleonName = mentions[chameleon].display_name
@@ -117,12 +152,14 @@ async def on_message(message):
                 votedFor = mentions[result].display_name
                 await message.channel.send('You voted for {}, who was *not* the chameleon. {} wins as the chameleon!'
                                            .format(votedFor, chameleonName))
+                guildGameInProg[guildId] = False
                 return
             else:
                 # if chameleon voted, give 30 secs to guess word
                 await message.channel.send('{0} has been ousted as the chameleon! {0}, you have 30 seconds to guess the word to win!'
                                            .format(chameleonName))
-                await cardMsg.edit(content=cardText)
+                if hideCard:
+                    await cardMsg.edit(content=cardText)
                 def check(m):
                     return m.author == mentions[chameleon] and m.channel == message.channel
 
@@ -134,20 +171,51 @@ async def on_message(message):
                     await message.channel.send(
                         '{0} has failed to guess the word correctly! {0} loses!'
                         .format(chameleonName))
+            guildGameInProg[guildId] = False
+            guildVotes[guildId] = {}
+
+    if message.content.startswith('$skip'):
+        guildSkips[message.guild.id]['skip'] = True
+
+    if message.content.startswith('$stop'):
+        guildSkips[message.guild.id]['stop'] = True
+
+    if message.content.startswith('$vote'):
+        guildId = message.guild.id
+        if guildId in guildGameInProg:
+            if not guildGameInProg[guildId]:
+                await message.channel.send('There is no game in progress!')
+                return
+        contentSplit = message.content.split()
+        if len(contentSplit) != 2:
+            await message.channel.send('Usage: `$vote *player number*')
+            return
+        # try:
+        if guildId not in guildVotes:
+            guildVotes[guildId] = {}
+        try:
+            guildVotes[guildId][message.author.id] = int(contentSplit[1])
+        except Exception as e:
+            print(e)
+            await message.channel.send('Your vote must be a number!')
+
     if message.content.startswith('!num'):
         number = int(message.content.split()[1])
         await message.channel.send(numberEmojis[number])
 
     if message.content.startswith('!vmsg'):
+        guildId = message.guild.id
         votingMessageString = await makeVotingMessage(message.mentions, numberEmojis)
         votingMessage = await message.channel.send(votingMessageString)
-        await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
+        guildGameInProg[guildId] = True
+        # await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
         await asyncio.sleep(5)
-        result = await getResult(votingMessage, numberEmojis)
+        result = await getMsgResults(guildVotes[guildId].items(), message.mentions)
         if result == -1:
             await message.channel.send('Voting resulted in a tie! Chameleon wins!')
         else:
             await message.channel.send('You voted for {}!'.format(message.mentions[result].display_name))
+        guildGameInProg[guildId] = False
 
     if message.content.startswith('!table'):
         category, words = getWordList(0)

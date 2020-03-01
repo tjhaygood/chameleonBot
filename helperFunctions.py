@@ -34,7 +34,7 @@ async def sendWordDM(word, user, chameleon):
         await messageUser('The secret word is: **{}**\nGive a word related to the secret word. Try not to give it to the chameleon!'.format(word), user)
 
 async def makeVotingMessage(members, numberEmojis):
-    returnString = 'Cast your votes now!\n\n'
+    returnString = 'Cast your votes using `$vote *number*` now!\n\n'
     for i in range(0, len(members)):
         returnString += numberEmojis[i+1] + ' : ' + members[i].display_name + '\n'
     return returnString
@@ -43,7 +43,7 @@ async def addVotingReactions(membersNum, numberEmojis, message):
     for i in range(0, membersNum):
         await message.add_reaction(numberEmojis[i+1])
 
-async def getResult(vmessage, numberEmojis):
+async def getReactResults(vmessage, numberEmojis):
     validEmojis = list(numberEmojis.values())
     counts = {}
     message = await vmessage.channel.fetch_message(vmessage.id)
@@ -66,6 +66,31 @@ async def getResult(vmessage, numberEmojis):
         for i in range(0, len(validEmojis)):
             if maxEmoji == validEmojis[i]:
                 return i
+
+async def getMsgResults(results, members):
+    counts = {}
+    memberIds = [x.id for x in members]
+    for tuple in results:
+        memberId = tuple[0]
+        vote = tuple[1]
+        if memberId in memberIds and vote in range(1, len(members)+1):
+            if vote in counts:
+                counts[vote] += 1
+            else:
+                counts[vote] = 1
+    max = float('-inf')
+    maxIndex = None
+    for tuple in counts.items():
+        if tuple[1] > max:
+            maxIndex, max = tuple
+    maxCount = 0
+    for tuple in counts.items():
+        if tuple[1] == max:
+            maxCount += 1
+    if maxCount > 1 or maxIndex is None:
+        return -1
+    else:
+        return maxIndex-1
 
 
 def buildWordsCard(category, list):
