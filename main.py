@@ -24,6 +24,9 @@ numberEmojis = {
     10 : '🔟'
 }
 
+guildCardQueues = {}
+
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -44,6 +47,13 @@ async def on_message(message):
         if len(mentions) > 10:
             await message.channel.send('This game can only be played with up to 10 players, sorry!')
             return
+        if message.author not in mentions:
+            await message.channel.send('You cannot start a game that you are not a part of!')
+            return
+        for member in mentions:
+            if member.bot:
+                await message.channel.send('You cannot play this game with bots!')
+                return
         if len(mentions) > 6:
             hideCard = True
         messageContentList = message.content.split()
@@ -51,18 +61,27 @@ async def on_message(message):
         if length > (len(mentions) + 1):
             if length == len(mentions) + 2:
                 try:
-                    thinkingDuration = int(messageContentList[length-1])
+                    argOne = int(messageContentList[length-1])
+                    thinkingDuration = argOne if argOne < 60 else thinkingDuration
                 except:
                     pass
             else:
                 try:
-                    thinkingDuration = int(messageContentList[len(mentions) + 1])
-                    gameDuration = int(messageContentList[len(mentions) + 2])
+                    argOne = int(messageContentList[len(mentions) + 1])
+                    argTwo = int(messageContentList[len(mentions) + 2])
+                    thinkingDuration = argOne if argOne < 60 else thinkingDuration
+                    gameDuration = argTwo * 60 if argTwo > 1 and argTwo < 5 else gameDuration
                 except:
                     pass
         # get words
-        category, words = getWordList(0)
+        global guildCardQueues
+        if len(guildCardQueues[message.guild.id]) == 0:
+            guildCardQueues[message.guild.id] = newCardQueue()
+        queue = guildCardQueues[message.guild.id]
+        category, words = getWordList(queue.pop(0))
         # print word table
+        cardText = buildWordsCard(category, words)
+        cardMsg = await message.channel.send(cardText)
         # DM players listed
         word = random.choice(words)
         chameleon = random.randint(0, len(mentions))
@@ -73,7 +92,9 @@ async def on_message(message):
                 await sendWordDM(word, mentions[i], False)
         # wait for people to come up with words
         await asyncio.sleep(thinkingDuration)
-        # hide card if > 8
+        # hide card if > 6
+        if hideCard:
+            await cardMsg.edit(content='**{}**\n\n*Card is hidden since we have more than 6 players.*')
         await message.channel.send('Say your words!')
         await asyncio.sleep(3 * len(mentions))
         # wait for game time - 30 seconds
@@ -101,6 +122,7 @@ async def on_message(message):
                 # if chameleon voted, give 30 secs to guess word
                 await message.channel.send('{0} has been ousted as the chameleon! {0}, you have 30 seconds to guess the word to win!'
                                            .format(chameleonName))
+                await cardMsg.edit(content=cardText)
                 def check(m):
                     return m.author == mentions[chameleon] and m.channel == message.channel
 
@@ -126,11 +148,10 @@ async def on_message(message):
             await message.channel.send('Voting resulted in a tie! Chameleon wins!')
         else:
             await message.channel.send('You voted for {}!'.format(message.mentions[result].display_name))
-            if result != 2:
-                await message.channel.send('You voted for')
 
     if message.content.startswith('!table'):
         category, words = getWordList(0)
+        await message.channel.send(buildWordsCard(category, words))
 
 
 
@@ -145,6 +166,9 @@ async def on_raw_reaction_add(payload):
 @client.event
 async def on_ready():
     print('We have logged in as {0.user}'.format(client))
+    global guildCardQueues
+    for guild in client.guilds:
+        guildCardQueues[guild.id] = newCardQueue()
 
 
 

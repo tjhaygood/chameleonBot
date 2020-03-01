@@ -1,4 +1,5 @@
 import json
+import random
 
 async def sendPlayUsage(channel):
     await channel.send('Usage: `$play [mentions] thinkingDuration* gameDuration*`\n* - optional')
@@ -11,12 +12,26 @@ def getWordList(index):
     tupleList = list(cats.items())
     return tupleList[index]
 
+def getNumCats():
+    file = open('categories.json', 'r')
+    jsonString = file.read()
+    file.close()
+    cats = json.loads(jsonString)
+    keyList = list(cats.keys())
+    return len(keyList)
+
+def newCardQueue():
+    numCats = getNumCats()
+    indexList = list(range(numCats))
+    random.shuffle(indexList)
+    return indexList
+
 
 async def sendWordDM(word, user, chameleon):
     if chameleon:
         await messageUser('You are the chameleon! Try to blend in!', user)
     else:
-        await messageUser('The secret word is: {}\nGive a word related to the secret word. Try not to give it to the chameleon!'.format(word), user)
+        await messageUser('The secret word is: **{}**\nGive a word related to the secret word. Try not to give it to the chameleon!'.format(word), user)
 
 async def makeVotingMessage(members, numberEmojis):
     returnString = 'Cast your votes now!\n\n'
@@ -52,7 +67,35 @@ async def getResult(vmessage, numberEmojis):
             if maxEmoji == validEmojis[i]:
                 return i
 
-# async def
+
+def buildWordsCard(category, list):
+    returnString = '**' + category + '** \n \n'
+    returnString += '```'
+    maxLength = 0
+    for i in list:
+        curLength = len(str(i))
+        if curLength > maxLength:
+            maxLength = curLength
+    line = '|'
+    space = ' '
+    dash = '-'
+    block = (dash * (maxLength + 3)) + line
+    numColumns = 4
+    returnString += line + block*numColumns + '\n'
+    i=0
+    while i < len(list):
+        for j in range(0, numColumns):
+            # # printing last column with a blank space
+            # if j == numColumns-1 and i > numColumns:
+            #     returnString += line + space * (maxLength + 3)
+            # else:
+            returnString += line + space
+            returnString += str(list[i]) + space * ((maxLength + 2) - len(str(list[i])))
+            i += 1
+        returnString += line + '\n'
+        returnString += line + (block * numColumns) + '\n'
+    returnString += '```'
+    return returnString
 
 
 async def messageUser(message, user):
