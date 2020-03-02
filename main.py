@@ -32,6 +32,10 @@ guildGameInProg = {}
 
 guildVotes = {}
 
+guildPlayers = {}
+
+guildVotingStage = {}
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -40,6 +44,8 @@ async def on_message(message):
     global guildSkips
     global guildGameInProg
     global guildVotes
+    global guildPlayers
+    global guildVotingStage
     if message.content.startswith('$play'):
         guildId = message.guild.id
         if guildId in guildGameInProg:
@@ -72,6 +78,8 @@ async def on_message(message):
         if len(mentions) > 6:
             hideCard = True
         guildGameInProg[guildId] = True
+        guildVotingStage[guildId] = False
+        guildPlayers[guildId] = [m.id for m in mentions]
         messageContentList = message.content.split()
         length = len(messageContentList)
         if length > (len(mentions) + 1):
@@ -114,6 +122,8 @@ async def on_message(message):
         guildSkips[guildId]['skip'] = False
         if guildSkips[guildId]['stop']:
             guildGameInProg[guildId] = False
+            guildPlayers[guildId] = []
+            guildVotingStage[guildId] = False
             return
         # hide card if > 6
         if hideCard:
@@ -129,14 +139,17 @@ async def on_message(message):
         guildSkips[guildId]['skip'] = False
         if guildSkips[guildId]['stop']:
             guildGameInProg[guildId] = False
+            guildPlayers[guildId] = []
+            guildVotingStage[guildId] = False
             return
         # display voting message, add reactions
+        guildVotingStage[guildId] = True
         votingMessageString = await makeVotingMessage(message.mentions, numberEmojis)
         votingMessage = await message.channel.send(votingMessageString)
         # await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
         # collect votes
         i = 0
-        while i < 30 and not guildSkips[guildId]['skip']:
+        while i < 30 and not guildSkips[guildId]['skip'] and not len(list(guildVotes[guildId].keys())) == len(mentions):
             await asyncio.sleep(1)
             i += 1
         # result = await getResult(votingMessage, numberEmojis)
@@ -144,6 +157,8 @@ async def on_message(message):
         if result == -1:
             await message.channel.send('Voting resulted in a tie! Chameleon wins!')
             guildGameInProg[guildId] = False
+            guildPlayers[guildId] = []
+            guildVotingStage[guildId] = False
             return
         else:
             chameleonName = mentions[chameleon].display_name
@@ -153,6 +168,8 @@ async def on_message(message):
                 await message.channel.send('You voted for {}, who was *not* the chameleon. {} wins as the chameleon!'
                                            .format(votedFor, chameleonName))
                 guildGameInProg[guildId] = False
+                guildPlayers[guildId] = []
+                guildVotingStage[guildId] = False
                 return
             else:
                 # if chameleon voted, give 30 secs to guess word
@@ -169,9 +186,11 @@ async def on_message(message):
                                                .format(chameleonName))
                 else:
                     await message.channel.send(
-                        '{0} has failed to guess the word correctly! {0} loses!'
-                        .format(chameleonName))
+                        '{0} has failed to guess the word correctly! The word was {1}! {0} loses!'
+                        .format(chameleonName, word))
+            guildPlayers[guildId] = []
             guildGameInProg[guildId] = False
+            guildVotingStage[guildId] = False
             guildVotes[guildId] = {}
 
     if message.content.startswith('$skip'):
@@ -182,10 +201,17 @@ async def on_message(message):
 
     if message.content.startswith('$vote'):
         guildId = message.guild.id
+        if message.author.id not in guildPlayers[guildId]:
+            await message.channel.send('You\'re not in a game!')
+            return
         if guildId in guildGameInProg:
             if not guildGameInProg[guildId]:
                 await message.channel.send('There is no game in progress!')
                 return
+            elif guildGameInProg[guildId]:
+                if guildVotingStage[guildId] == False:
+                    await message.channel.send('Voting has not begun!')
+                    return
         contentSplit = message.content.split()
         if len(contentSplit) != 2:
             await message.channel.send('Usage: `$vote *player number*')
@@ -216,6 +242,7 @@ async def on_message(message):
         else:
             await message.channel.send('You voted for {}!'.format(message.mentions[result].display_name))
         guildGameInProg[guildId] = False
+        guildPlayers[guildId] = []
 
     if message.content.startswith('!table'):
         category, words = getWordList(0)
