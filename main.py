@@ -164,7 +164,7 @@ async def on_message(message):
                     return m.author == mentions[chameleon] and m.channel == message.channel
 
                 answerMsg = await client.wait_for('message', check=check, timeout=30)
-                if answerMsg.content.lower() == word.lower():
+                if answerMsg.content.lower().strip() == word.lower():
                     await message.channel.send('{0} has guessed the word correctly! {0} wins as the chameleon!'
                                                .format(chameleonName))
                 else:
