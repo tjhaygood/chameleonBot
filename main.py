@@ -160,7 +160,7 @@ async def on_message(message):
             return
         # display voting message, add reactions
         guildVotingStage[guildId] = True
-        votingMessageString = await makeVotingMessage(message.mentions, numberEmojis)
+        votingMessageString = await makeVotingMessage(mentions, numberEmojis)
         votingMessage = await message.channel.send(votingMessageString)
         # await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
         # collect votes
