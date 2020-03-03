@@ -228,7 +228,7 @@ async def on_message(message):
                     return
         contentSplit = message.content.split()
         if len(contentSplit) != 2:
-            await message.channel.send('Usage: `$vote *player number*')
+            await message.channel.send('Usage: `$vote *player number*`')
             return
         # try:
         if guildId not in guildVotes:
