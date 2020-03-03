@@ -191,8 +191,13 @@ async def on_message(message):
                     await cardMsg.edit(content=cardText)
                 def check(m):
                     return m.author == mentions[chameleon] and m.channel == message.channel
-
-                answerMsg = await client.wait_for('message', check=check, timeout=30)
+                try:
+                    answerMsg = await client.wait_for('message', check=check, timeout=30)
+                except asyncio.TimeoutError:
+                    await message.channel.send('{0} ran out of time! The word was {1}! {0} loses!'
+                                               .format(chameleonName, word))
+                    stopGame(guildId)
+                    return
                 if answerMsg.content.lower().strip() == word.lower():
                     await message.channel.send('{0} has guessed the word correctly! {0} wins as the chameleon!'
                                                .format(chameleonName))
