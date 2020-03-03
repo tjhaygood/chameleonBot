@@ -99,9 +99,9 @@ async def on_message(message):
                     pass
         # get words
         global guildCardQueues
-        if len(guildCardQueues[message.guild.id]) == 0:
-            guildCardQueues[message.guild.id] = newCardQueue()
-        queue = guildCardQueues[message.guild.id]
+        if guildId not in guildCardQueues or len(guildCardQueues[guildId]) == 0:
+            guildCardQueues[guildId] = newCardQueue()
+        queue = guildCardQueues[guildId]
         category, words = getWordList(queue.pop(0))
         # print word table
         cardText = buildWordsCard(category, words)
