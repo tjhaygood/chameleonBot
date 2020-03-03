@@ -165,7 +165,7 @@ async def on_message(message):
         # await addVotingReactions(len(message.mentions), numberEmojis, votingMessage)
         # collect votes
         i = 0
-        while i < 30 and not guildSkips[guildId]['skip'] and not len(list(guildVotes[guildId].keys())) == len(mentions):
+        while i < 30 and not len(list(guildVotes[guildId].keys())) == len(mentions):
             await asyncio.sleep(1)
             i += 1
         # result = await getResult(votingMessage, numberEmojis)
