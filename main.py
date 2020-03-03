@@ -170,12 +170,12 @@ async def on_message(message):
             i += 1
         # result = await getResult(votingMessage, numberEmojis)
         result = await getMsgResults(guildVotes[guildId].items(), mentions)
+        chameleonName = mentions[chameleon].display_name
         if result == -1:
-            await message.channel.send('Voting resulted in a tie! Chameleon wins!')
+            await message.channel.send('Voting resulted in a tie! {} wins as the chameleon!'.format(chameleonName))
             stopGame(guildId)
             return
         else:
-            chameleonName = mentions[chameleon].display_name
             # if chameleon not voted, chameleon wins
             if result != chameleon:
                 votedFor = mentions[result].display_name
